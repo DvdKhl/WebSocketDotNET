@@ -30,7 +30,7 @@ namespace WebSocket.Streams {
 			this.ServerCertificatePath = serverCertificatePath;
 			//frameInfo.Owner.SecureStream = new WSSecureStream(receiveSAEA.AcceptSocket);
 			//frameInfo.Owner.TLSStream = new SslStream(frameInfo.Owner.SecureStream, true);
-			//frameInfo.Owner.TLSStream.AuthenticateAsServer(X509Certificate2.CreateFromCertFile(@"D:\Certs\DvdKhlDevCA_localhost.cer"));
+			//frameInfo.Owner.TLSStream.AuthenticateAsServer(X509Certificate2.CreateFromCertFile(@"D:\Certs\DvdKhlDevCA.cer"));
 			//frameInfo.Owner.TLSStream.Flush();
 			//frameInfo.Owner.SecureStream.FinishedTLSHandshaking();
 		}

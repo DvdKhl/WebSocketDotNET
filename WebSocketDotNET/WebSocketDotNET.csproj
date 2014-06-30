@@ -18,7 +18,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -49,13 +49,13 @@
     <Compile Include="PayloadHandlers\ByteArrayPayloadHandler.cs" />
     <Compile Include="PayloadHandlers\JSONPayloadHandler.cs" />
     <Compile Include="PayloadHandlers\StringPayloadHandler.cs" />
+    <Compile Include="SegmentGenerators\PingPongSegmentGenerator.cs" />
     <Compile Include="SegmentGenerators\StringSegmentGenerator.cs" />
     <Compile Include="Streams\WSSecureStream.cs" />
     <Compile Include="WSFrameInfo.cs" />
     <Compile Include="PayloadHandlers\IPayloadHandler.cs" />
     <Compile Include="SegmentGenerators\ISegmentGenerator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SocketAsyncEventArgsPool.cs" />
     <Compile Include="WebSocketServer.cs" />
     <Compile Include="WebSocketServerSettings.cs" />
     <Compile Include="WSClientInfo.cs" />

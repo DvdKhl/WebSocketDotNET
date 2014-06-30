@@ -9,9 +9,8 @@ using System.Threading.Tasks;
 namespace WebSocket.SegmentGenerators {
 	public class StringSegmentGenerator : ISegmentGenerator {
 		private ConcurrentQueue<StringSendState> pool = new ConcurrentQueue<StringSendState>();
-		private ConcurrentDictionary<WSClientInfo, StringSendState> pending = new ConcurrentDictionary<WSClientInfo, StringSendState>();
 
-		public void Add(WSClientInfo clientInfo, string str, int offset, int length) {
+		public object Add(string str, int offset, int length) {
 			StringSendState stringSendState;
 			if(!pool.TryDequeue(out stringSendState)) stringSendState = new StringSendState();
 
@@ -26,32 +25,31 @@ namespace WebSocket.SegmentGenerators {
 				stringSendState.ByteCount = -1;
 			}
 
-			if(!pending.TryAdd(clientInfo, stringSendState)) {
-				throw new NotSupportedException("Cannot send more than one message concurrently");
-			}
+			return stringSendState;
 		}
 
-		public int Read(WSClientInfo clientInfo, byte[] buffer, int offset, int length, out bool completed) {
-			StringSendState stringSendState;
-			if(!pending.TryRemove(clientInfo, out stringSendState)) {
+		public int Read(WSFrameInfo frameInfo, out bool completed) {
+			var stringSendState = frameInfo.Tag as StringSendState;
+
+			if(stringSendState == null) {
 				throw new InvalidOperationException("No pending messages for this client/generator pair");
 			}
 
 			int bytesUsed;
-			if(stringSendState.ByteCount == -1 || stringSendState.ByteCount > length) {
+			if(stringSendState.ByteCount == -1 || stringSendState.ByteCount > frameInfo.DataLength) {
 				if(stringSendState.Encoder == null) {
-					lock(pending) stringSendState.Encoder = Encoding.UTF8.GetEncoder();
+					lock(pool) stringSendState.Encoder = new UTF8Encoding().GetEncoder();
 				}
 
 				unsafe {
-					fixed(byte* bPtr = buffer)
+					fixed(byte* bPtr = frameInfo.Buffer)
 					fixed(char* strPtr = stringSendState.Value) {
 						int charsUsed;
 
 						stringSendState.Encoder.Convert(
 							strPtr + stringSendState.Position,
 							stringSendState.Value.Length - stringSendState.Position,
-							bPtr + offset, length,
+							bPtr + frameInfo.DataOffset, frameInfo.DataLength,
 							false, out charsUsed, out bytesUsed, out completed
 						);
 						stringSendState.Position += charsUsed;
@@ -62,7 +60,7 @@ namespace WebSocket.SegmentGenerators {
 				bytesUsed = Encoding.UTF8.GetBytes(
 					stringSendState.Value,
 					stringSendState.Offset, stringSendState.Length,
-					buffer, offset
+					frameInfo.Buffer, frameInfo.DataOffset
 				);
 				completed = true;
 			}
@@ -70,25 +68,25 @@ namespace WebSocket.SegmentGenerators {
 			if(completed) {
 				stringSendState.Encoder = null;
 				stringSendState.Value = null;
-				pool.Enqueue(stringSendState);
+				frameInfo.Tag = null;
 
-			} else if(!pending.TryAdd(clientInfo, stringSendState)) {
-				throw new NotSupportedException("Cannot send more than one message concurrently");
+				pool.Enqueue(stringSendState);
 			}
 
 
 			return bytesUsed;
 		}
 
-		public int Length(WSClientInfo clientInfo) {
-			StringSendState stringSendState;
-			if(!pending.TryGetValue(clientInfo, out stringSendState)) {
+		public int Length(WSFrameInfo frameInfo) {
+			var stringSendState = frameInfo.Tag as StringSendState;
+			if(stringSendState == null) {
 				throw new InvalidOperationException("No pending messages for this client/generator pair");
 			}
+
 			return stringSendState.ByteCount == -1 ? 0 : stringSendState.ByteCount;
 		}
 
-		public WSFrameInfoOpCode Type(WSClientInfo clientInfo) { return WSFrameInfoOpCode.Text; }
+		public WSFrameInfoOpCode Type(WSFrameInfo frameInfo) { return WSFrameInfoOpCode.Text; }
 
 
 		private class StringSendState {

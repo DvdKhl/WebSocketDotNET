@@ -11,44 +11,41 @@ namespace WebSocket.PayloadHandlers {
 		public event Action<WSClientInfo, string> MessageReceived;
 
 		private ConcurrentQueue<MemoryStream> pool = new ConcurrentQueue<MemoryStream>();
-		private ConcurrentDictionary<WSClientInfo, MemoryStream> pendingMessages = new ConcurrentDictionary<WSClientInfo, MemoryStream>();
 
 		public void Handle(WSFrameInfo frameInfo) {
-			if(frameInfo.IsFinal && frameInfo.OpCode != WSFrameInfoOpCode.Continuation) {
-				OnMessageReceived(frameInfo.Client, Encoding.UTF8.GetString(frameInfo.Buffer, frameInfo.DataOffset, frameInfo.DataLength));
+			var isLastBlock = frameInfo.IsFinal && frameInfo.UnmaskedBytes == frameInfo.PayloadLength;
+
+			if(isLastBlock && frameInfo.Tag == null && frameInfo.OpCode != WSFrameInfoOpCode.Continuation) {
+				var messageReceived = MessageReceived;
+				if(messageReceived != null) {
+					messageReceived(frameInfo.Client, Encoding.UTF8.GetString(frameInfo.Buffer, frameInfo.DataOffset, frameInfo.DataLength));
+				}
 
 			} else {
-				MemoryStream stream;
-				bool success;
-
-				if(frameInfo.IsFinal) {
-					success = pendingMessages.TryRemove(frameInfo.Client, out stream);
-				} else {
-					success = pendingMessages.TryGetValue(frameInfo.Client, out stream);
-				}
-				if(!success && !pool.TryDequeue(out stream)) {
+				var stream = frameInfo.Tag as MemoryStream;
+				if(stream == null && !pool.TryDequeue(out stream)) {
 					stream = new MemoryStream(1024);
-					if(!pendingMessages.TryAdd(frameInfo.Client, stream)) throw new NotSupportedException("Cannot handle more than one message concurrently");
 				}
 
-				stream.Write(frameInfo.Buffer, frameInfo.BufferOffset, frameInfo.BufferLength);
+				stream.Write(frameInfo.Buffer, frameInfo.DataOffset, frameInfo.DataLength);
 
-				if(frameInfo.IsFinal) {
-					OnMessageReceived(frameInfo.Client, Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length));
+				if(isLastBlock) {
+					var messageReceived = MessageReceived;
+					if(messageReceived != null) {
+						messageReceived(frameInfo.Client, Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length));
+					}
 
 					stream.Position = 0;
 					stream.SetLength(0);
 					pool.Enqueue(stream);
+					frameInfo.Tag = null;
 
+				} else {
+					frameInfo.Tag = stream;
 				}
 			}
-
 		}
 
-		protected void OnMessageReceived(WSClientInfo clientInfo, string msg) {
-			var messageReceived = MessageReceived;
-			if(messageReceived != null) messageReceived(clientInfo, msg);
-		}
 
 
 		public static StringPayloadHandler Instance { get { return instance.Value; } }

@@ -12,12 +12,10 @@ namespace WebSocket {
 		internal WSFrameInfoAction Action { get; set; }
 		internal bool HeaderProcessed { get; set; }
 		internal bool IsMasked { get; set; }
-		internal byte[] Mask { get; set; }
-		internal long ProcessedPayloadBytes { get; set; }
-		internal long BytesTransferred { get; set; }
-		internal long MessageLength { get; set; }
-		//internal long MessagePosition { get; set; }
-		internal long MessageBytesTransferred { get; set; }
+		internal ulong Mask { get; set; }
+		internal long UnmaskedBytes { get; set; }
+		internal long MessagePayloadLength { get; set; }
+		internal long MessagePayloadBytesTransferred { get; set; }
 
 
 		internal IPayloadHandler PayloadHandler { get; set; }
@@ -39,6 +37,7 @@ namespace WebSocket {
 		public int DataLength { get; internal set; }
 
 		public WSClientInfo Client { get; internal set; }
+		public object Tag { get; set; }
 
 		public void GetSAEABuffer(SocketAsyncEventArgs saea) {
 			Buffer = saea.Buffer;
@@ -47,7 +46,6 @@ namespace WebSocket {
 		}
 
 		public WSFrameInfo() {
-			Mask = new byte[4];
 			OpCode = WSFrameInfoOpCode.None;
 		}
 
@@ -56,11 +54,10 @@ namespace WebSocket {
 
 			HeaderProcessed = false;
 			IsMasked = false;
-			Mask[0] = Mask[1] = Mask[2] = Mask[3] = 0;
-			ProcessedPayloadBytes = 0;
-			BytesTransferred = 0;
-			MessageLength = 0;
-			MessageBytesTransferred = 0;
+			Mask = 0;
+			UnmaskedBytes = 0;
+			MessagePayloadLength = 0;
+			MessagePayloadBytesTransferred = 0;
 
 			PayloadHandler = null;
 			SegmentGenerator = null;
@@ -80,14 +77,15 @@ namespace WebSocket {
 			DataLength = 0;
 
 			Client = null;
+			Tag = null;
 		}
 
 		public override string ToString() {
 			return string.Format(
-				"WSFrameInfo(HeaderProcessed={0} IsMasked={1} BitConverter.ToUInt32(Mask, 0)={2} ProcessedPayloadBytes={3} BytesTransferred={4} MessageLength={5} MessageBytesTransferred={6} PayloadHandler={7} SegmentGenerator={8} Version={9} OpCode={10} IsFinal={11} PayloadLength={12} HeaderLength={13} Buffer.Length={14} BufferOffset={15} BufferPosition={16} BufferLength={17} DataOffset={18} DataLength={19} Client={20})",
-				HeaderProcessed, IsMasked, BitConverter.ToUInt32(Mask, 0),
-				ProcessedPayloadBytes, BytesTransferred,
-				MessageLength, MessageBytesTransferred,
+				"WSFrameInfo(\n\tHeaderProcessed={0} IsMasked={1} Mask={2}\n\tUnmaskedBytes={3} MessageLength={4} MessagePayloadBytesTransferred={5}\n\tPayloadHandler={6} SegmentGenerator={7}\n\tVersion={8} OpCode={9} IsFinal={10} PayloadLength={11} HeaderLength={12}\n\tBuffer.Length={13} BufferOffset={14} BufferPosition={15} BufferLength={16}\n\tDataOffset={17} DataLength={18} Client={19}\n)",
+				HeaderProcessed, IsMasked, Mask,
+				UnmaskedBytes,
+				MessagePayloadLength, MessagePayloadBytesTransferred,
 				PayloadHandler, SegmentGenerator,
 				Version, OpCode, IsFinal, PayloadLength, HeaderLength,
 				Buffer.Length, BufferOffset, BufferPosition, BufferLength,
@@ -98,7 +96,7 @@ namespace WebSocket {
 	}
 
 	public enum WSFrameInfoAction {
-		None, Handshake, Receive, Send
+		None, HandshakeReceive, HandshakeSend, Receive, Send, Close
 	}
 
 	public enum WSFrameInfoVersion {
